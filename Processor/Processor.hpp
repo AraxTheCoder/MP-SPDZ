@@ -585,8 +585,8 @@ void SubProcessor<T>::mulrs(const vector<int>& reg)
         int n_mul = reg[4 * i];
         if (remaining_active >= 0)
         {
-          n_mul = min(n_mul, remaining_active);
-          remaining_active -= n_mul;
+            n_mul = min(n_mul, remaining_active);
+            remaining_active -= n_mul;
         }
         for (int j = 0; j < n_mul; j++)
         {
