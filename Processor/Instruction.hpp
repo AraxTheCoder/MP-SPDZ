@@ -979,9 +979,9 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
                 "integer registers only have 64 bits");
           values.push_back(tmp);
       }
-        if (r[2])
+      if (r[2])
           Procp.protocol.sync(values, Proc.P);
-        for (int i = 0; i < active_size; i++)
+      for (int i = 0; i < active_size; i++)
           Proc.write_Ci(r[0] + i, values[i].get());
       return;
   }
