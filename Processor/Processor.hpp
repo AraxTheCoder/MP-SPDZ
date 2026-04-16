@@ -472,13 +472,6 @@ void SubProcessor<T>::POpen(const Instruction& inst)
     check();
   auto& reg = inst.get_start();
   int size = inst.get_size();
-  static int popen_debug_prints = 0;
-  if (popen_debug_prints < 20 and Proc)
-  {
-    cerr << "[popen-debug] size=" << size << " arg=" << Proc->get_arg().get()
-         << " pairs=" << (reg.size() / 2) << endl;
-    popen_debug_prints++;
-  }
   if (size == 0)
     return;
   assert(reg.size() % 2 == 0);
@@ -508,13 +501,13 @@ void SubProcessor<T>::muls(const vector<int>& reg)
 {
     assert(reg.size() % 4 == 0);
 
-  int active_size = -1;
-  if (Proc)
-  {
-    long prefix = Proc->get_arg().get();
-    if (prefix < 0)
-      active_size = int(-prefix);
-  }
+    int active_size = -1;
+    if (Proc)
+    {
+        long prefix = Proc->get_arg().get();
+        if (prefix < 0)
+            active_size = int(-prefix);
+    }
 
     SubProcessor<T>& proc = *this;
     protocol.init_mul();
@@ -525,13 +518,13 @@ void SubProcessor<T>::muls(const vector<int>& reg)
             assert(proc.S.begin() + *(it + j) <= proc.S.end());
         auto x = proc.S.begin() + *(it + 2);
         auto y = proc.S.begin() + *(it + 3);
-      int n_mul = *it;
-      if (remaining_active >= 0)
-      {
-        n_mul = min(n_mul, remaining_active);
-        remaining_active -= n_mul;
-      }
-      for (int j = 0; j < n_mul; j++)
+        int n_mul = *it;
+        if (remaining_active >= 0)
+        {
+            n_mul = min(n_mul, remaining_active);
+            remaining_active -= n_mul;
+        }
+        for (int j = 0; j < n_mul; j++)
             protocol.prepare_mul(*x++, *y++);
     }
     protocol.exchange();
@@ -539,15 +532,15 @@ void SubProcessor<T>::muls(const vector<int>& reg)
     for (auto it = reg.begin(); it < reg.end(); it += 4)
     {
         auto z = proc.S.begin() + *(it + 1);
-      int n_mul = *it;
-      if (remaining_active >= 0)
-      {
-        n_mul = min(n_mul, remaining_active);
-        remaining_active -= n_mul;
-      }
-      for (int j = 0; j < n_mul; j++)
+        int n_mul = *it;
+        if (remaining_active >= 0)
+        {
+            n_mul = min(n_mul, remaining_active);
+            remaining_active -= n_mul;
+        }
+        for (int j = 0; j < n_mul; j++)
             *z++ = protocol.finalize_mul();
-      protocol.counter += n_mul;
+        protocol.counter += n_mul;
     }
 
     maybe_check();
@@ -559,47 +552,47 @@ void SubProcessor<T>::mulrs(const vector<int>& reg)
     assert(reg.size() % 4 == 0);
     int n = reg.size() / 4;
 
-  int active_size = -1;
-  if (Proc)
-  {
-    long prefix = Proc->get_arg().get();
-    if (prefix < 0)
-      active_size = int(-prefix);
-  }
+    int active_size = -1;
+    if (Proc)
+    {
+        long prefix = Proc->get_arg().get();
+        if (prefix < 0)
+            active_size = int(-prefix);
+    }
 
     SubProcessor<T>& proc = *this;
     protocol.init_mul();
     int remaining_active = active_size;
     for (int i = 0; i < n; i++)
     {
-    int n_mul = reg[4 * i];
-    if (remaining_active >= 0)
-    {
-      n_mul = min(n_mul, remaining_active);
-      remaining_active -= n_mul;
-    }
-    for (int j = 0; j < n_mul; j++)
+        int n_mul = reg[4 * i];
+        if (remaining_active >= 0)
+        {
+            n_mul = min(n_mul, remaining_active);
+            remaining_active -= n_mul;
+        }
+        for (int j = 0; j < n_mul; j++)
         {
             auto& x = proc.S[reg[4 * i + 2] + j];
             auto& y = proc.S[reg[4 * i + 3]];
             protocol.prepare_mul(x, y);
         }
-  }
+    }
     protocol.exchange();
     remaining_active = active_size;
     for (int i = 0; i < n; i++)
     {
-    int n_mul = reg[4 * i];
-    if (remaining_active >= 0)
-    {
-      n_mul = min(n_mul, remaining_active);
-      remaining_active -= n_mul;
-    }
-    for (int j = 0; j < n_mul; j++)
+        int n_mul = reg[4 * i];
+        if (remaining_active >= 0)
+        {
+          n_mul = min(n_mul, remaining_active);
+          remaining_active -= n_mul;
+        }
+        for (int j = 0; j < n_mul; j++)
         {
             proc.S[reg[4 * i + 1] + j] = protocol.finalize_mul();
         }
-    protocol.counter += n_mul;
+        protocol.counter += n_mul;
     }
 
     maybe_check();
@@ -608,11 +601,11 @@ void SubProcessor<T>::mulrs(const vector<int>& reg)
 template<class T>
 void SubProcessor<T>::dotprods(const vector<int>& reg, int size)
 {
-  if (size == 0)
-  {
-    maybe_check();
-    return;
-  }
+    if (size == 0)
+    {
+        maybe_check();
+        return;
+    }
     protocol.init_dotprod();
     for (int i = 0; i < size; i++)
     {
