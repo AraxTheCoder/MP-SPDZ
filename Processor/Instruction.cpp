@@ -21,10 +21,7 @@ void Instruction::execute_clear_gf2n(StackedVector<cgf2n>& registers,
 {
     auto& C2 = registers;
     auto& M2C = memory;
-    int active_size = size;
-    long prefix = Proc.get_arg().get();
-    if (prefix < 0)
-        active_size = min(active_size, int(-prefix));
+    int active_size = get_effective_vector_size(Proc, size);
     switch (opcode)
     {
 #define X(NAME, PRE, CODE) \
@@ -66,10 +63,7 @@ void Instruction::execute_regint(ArithmeticProcessor& Proc, MemoryPart<Integer>&
 {
     (void) Mi;
     auto& Ci = Proc.get_Ci();
-    int active_size = size;
-    long prefix = Proc.get_arg().get();
-    if (prefix < 0)
-        active_size = min(active_size, int(-prefix));
+    int active_size = get_effective_vector_size(Proc, size);
     switch (opcode)
     {
 #define X(NAME, PRE, CODE) \
@@ -81,10 +75,7 @@ void Instruction::execute_regint(ArithmeticProcessor& Proc, MemoryPart<Integer>&
 
 void Instruction::shuffle(ArithmeticProcessor& Proc) const
 {
-    int active_size = size;
-    long prefix = Proc.get_arg().get();
-    if (prefix < 0)
-        active_size = min(active_size, int(-prefix));
+    int active_size = get_effective_vector_size(Proc, size);
     for (int i = 0; i < active_size; i++)
         Proc.write_Ci(r[0] + i, Proc.read_Ci(r[1] + i));
     for (int i = 0; i < active_size; i++)
@@ -96,10 +87,7 @@ void Instruction::shuffle(ArithmeticProcessor& Proc) const
 
 void Instruction::bitdecint(ArithmeticProcessor& Proc) const
 {
-    int active_size = size;
-    long prefix = Proc.get_arg().get();
-    if (prefix < 0)
-        active_size = min(active_size, int(-prefix));
+    int active_size = get_effective_vector_size(Proc, size);
     for (int j = 0; j < active_size; j++)
     {
         long a = Proc.read_Ci(r[0] + j);
