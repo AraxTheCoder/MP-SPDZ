@@ -46,8 +46,7 @@ void BaseInstruction::parse(istream& s, int inst_pos)
   parse_operands(s, inst_pos, pos);
 }
 
-template<class sint, class sgf2n>
-inline int get_effective_vector_size(const Processor<sint, sgf2n>& Proc, int size)
+inline int get_effective_vector_size(const ProcessorBase& Proc, int size)
 {
   long prefix = Proc.get_arg().get();
   if (prefix < 0)
