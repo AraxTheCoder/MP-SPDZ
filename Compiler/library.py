@@ -41,6 +41,76 @@ def vectorize(function):
     copy_doc(vectorized_function, function)
     return vectorized_function
 
+def vectorized_function(function):
+    tape = FunctionCallTape(function)
+
+    def mask_output(value, active):
+        if isinstance(value, tuple):
+            return tuple(mask_output(x, active) for x in value)
+        if isinstance(value, list):
+            return [mask_output(x, active) for x in value]
+        if value is None:
+            return None
+        try:
+            size = value.size
+        except AttributeError:
+            return value
+        if size == 1:
+            return value
+        try:
+            return value * type(value).conv(active)
+        except Exception:
+            try:
+                return value * value.clear_type.conv(active)
+            except Exception:
+                return value
+
+    def get_vector_size(call_args, call_kwargs):
+        if 'size' in call_kwargs:
+            return call_kwargs['size']
+        for arg in call_args:
+            if hasattr(arg, 'size'):
+                return arg.size
+        return None
+
+    def wrapped(*args, **kwargs):
+        active_len = kwargs.pop('active_len', None)
+        call_args = args
+        
+        # active_len_value = None
+        if isinstance(active_len, cint):
+            active_len = active_len.to_regint(sync=False)
+        if isinstance(active_len, regint):
+            active_len = MemValue(active_len).read()
+
+        set_vector_size = False
+        size = get_vector_size(call_args, kwargs)
+
+        if size is not None:
+            if 'size' in kwargs:
+                del kwargs['size']
+            instructions_base.set_global_vector_size(size)
+            set_vector_size = True
+
+        if active_len is not None:
+            tape.runtime_arg = -active_len
+        else:
+            tape.runtime_arg = None
+
+        try:
+            res = tape(*call_args, **kwargs)
+            if active_len is not None and size is not None and size != 1:
+                active = regint.inc(size) < active_len
+                res = mask_output(res, active)
+            return res
+        finally:
+            if set_vector_size:
+                instructions_base.reset_global_vector_size()
+            tape.runtime_arg = None
+    wrapped.__name__ = function.__name__
+    copy_doc(wrapped, function)
+    return wrapped
+
 def set_instruction_type(function):
     def instruction_typed_function(*args, **kwargs):
         if len(args) > 0 and isinstance(args[0], Tape.Register):
@@ -410,6 +480,7 @@ class FunctionCallTape(FunctionTape):
     def __init__(self, *args, **kwargs):
         super(FunctionTape, self).__init__(*args, **kwargs)
         self.instances = {}
+        self.runtime_arg = None
     @staticmethod
     def get_key(args, kwargs):
         key = (get_program(),)
@@ -510,8 +581,12 @@ class FunctionCallTape(FunctionTape):
             elif isinstance(x, types._vectorizable):
                 call_args += [0, base.vm_types['ci'], 1,
                               x.address, regint.conv(y.address)]
-        call_tape(tape_handle, regint(0),
-                  *call_args)
+        if self.runtime_arg is not None:
+            runtime_arg = self.runtime_arg
+        else:
+            runtime_arg = regint(0)
+        call_tape(tape_handle, runtime_arg,
+              *call_args)
         break_point('call-%s' % self.name)
         return untuplify(tuple(out_result))
 

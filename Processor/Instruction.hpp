@@ -46,6 +46,15 @@ void BaseInstruction::parse(istream& s, int inst_pos)
   parse_operands(s, inst_pos, pos);
 }
 
+template<class sint, class sgf2n>
+inline int get_effective_vector_size(const Processor<sint, sgf2n>& Proc, int size)
+{
+  long prefix = Proc.get_arg().get();
+  if (prefix < 0)
+    return min(size, int(-prefix));
+  return size;
+}
+
 inline
 void BaseInstruction::parse_operands(istream& s, int pos, int file_pos)
 {
@@ -947,14 +956,17 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
 {
   auto& Procp = Proc.Procp;
   auto& Proc2 = Proc.Proc2;
+  int active_size = get_effective_vector_size(Proc, size);
+  auto active_inst = *this;
+  active_inst.size = active_size;
 
   // optimize some instructions
   switch (opcode)
   {
     case CONVMODP:
       vector<Integer> values;
-      values.reserve(size);
-      for (int i = 0; i < size; i++)
+      values.reserve(active_size);
+      for (int i = 0; i < active_size; i++)
       {
           auto source = Proc.read_Cp(r[1] + i);
           Integer tmp;
@@ -967,16 +979,16 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
                 "integer registers only have 64 bits");
           values.push_back(tmp);
       }
-      if (r[2])
+        if (r[2])
           Procp.protocol.sync(values, Proc.P);
-      for (int i = 0; i < size; i++)
+        for (int i = 0; i < active_size; i++)
           Proc.write_Ci(r[0] + i, values[i].get());
       return;
   }
 
   int r[3] = {this->r[0], this->r[1], this->r[2]};
   int64_t n = this->n;
-  for (int i = 0; i < size; i++) 
+  for (int i = 0; i < active_size; i++) 
   { switch (opcode)
     {
       case LDMC:
@@ -1143,16 +1155,16 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
         Proc.write_Cp(r[0],Proc.temp.ansp);
         break;
       case SHRSI:
-        sint::shrsi(Procp, *this);
+        sint::shrsi(Procp, active_inst);
         return;
       case GSHRSI:
-        sgf2n::shrsi(Proc2, *this);
+        sgf2n::shrsi(Proc2, active_inst);
         return;
       case OPEN:
-        Proc.Procp.POpen(*this);
+        Proc.Procp.POpen(active_inst);
         return;
       case GOPEN:
-        Proc.Proc2.POpen(*this);
+        Proc.Proc2.POpen(active_inst);
         return;
       case MULS:
         Proc.Procp.muls(start);
@@ -1167,48 +1179,48 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
         Proc.Proc2.protocol.mulrs(start, Proc.Proc2);
         return;
       case DOTPRODS:
-        Proc.Procp.dotprods(start, size);
+        Proc.Procp.dotprods(start, active_size);
         return;
       case GDOTPRODS:
-        Proc.Proc2.dotprods(start, size);
+        Proc.Proc2.dotprods(start, active_size);
         return;
       case MATMULS:
-        Proc.Procp.matmuls(Proc.Procp.get_S(), *this);
+        Proc.Procp.matmuls(Proc.Procp.get_S(), active_inst);
         return;
       case GMATMULS:
-        Proc.Proc2.matmuls(Proc.Proc2.get_S(), *this);
+        Proc.Proc2.matmuls(Proc.Proc2.get_S(), active_inst);
         return;
       case MATMULSM:
-        Proc.Procp.protocol.matmulsm(Proc.Procp, Proc.machine.Mp.MS, *this);
+        Proc.Procp.protocol.matmulsm(Proc.Procp, Proc.machine.Mp.MS, active_inst);
         return;
       case GMATMULSM:
-        Proc.Proc2.protocol.matmulsm(Proc.Proc2, Proc.machine.M2.MS, *this);
+        Proc.Proc2.protocol.matmulsm(Proc.Proc2, Proc.machine.M2.MS, active_inst);
         return;
       case CONV2DS:
-        Proc.Procp.protocol.conv2ds(Proc.Procp, *this);
+        Proc.Procp.protocol.conv2ds(Proc.Procp, active_inst);
         return;
       case TRUNC_PR:
-        Proc.Procp.protocol.trunc_pr(start, size, Proc.Procp,
+        Proc.Procp.protocol.trunc_pr(start, active_size, Proc.Procp,
             sint::clear::characteristic_two);
         return;
       case SECSHUFFLE:
-        Proc.Procp.secure_shuffle(*this);
+        Proc.Procp.secure_shuffle(active_inst);
         return;
       case GSECSHUFFLE:
-        Proc.Proc2.secure_shuffle(*this);
+        Proc.Proc2.secure_shuffle(active_inst);
         return;
       case GENSECSHUFFLE:
-        Proc.write_Ci(r[0], Proc.Procp.generate_secure_shuffle(*this,
+        Proc.write_Ci(r[0], Proc.Procp.generate_secure_shuffle(active_inst,
             Proc.machine.shuffle_store));
         return;
       case APPLYSHUFFLE:
-        Proc.Procp.apply_shuffle(*this, Proc.machine.shuffle_store);
+        Proc.Procp.apply_shuffle(active_inst, Proc.machine.shuffle_store);
         return;
       case DELSHUFFLE:
         Proc.machine.shuffle_store.del(Proc.read_Ci(r[0]));
         return;
       case INVPERM:
-        Proc.Procp.inverse_permutation(*this);
+        Proc.Procp.inverse_permutation(active_inst);
         return;
       case CHECK:
         {
@@ -1390,20 +1402,20 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
         break;
       case WRITEFILESHARE:
         // Write shares to file system
-        Procp.write_shares_to_file(Proc.read_Ci(r[0]), start, size);
+        Procp.write_shares_to_file(Proc.read_Ci(r[0]), start, active_size);
         return;
       case READFILESHARE:
         // Read shares from file system
-        Procp.read_shares_from_file(Proc.read_Ci(r[0]), r[1], start, size,
+        Procp.read_shares_from_file(Proc.read_Ci(r[0]), r[1], start, active_size,
             Proc);
         return;
       case GWRITEFILESHARE:
         // Write shares to file system
-        Proc2.write_shares_to_file(Proc.read_Ci(r[0]), start, size);
+        Proc2.write_shares_to_file(Proc.read_Ci(r[0]), start, active_size);
         return;
       case GREADFILESHARE:
         // Read shares from file system
-        Proc2.read_shares_from_file(Proc.read_Ci(r[0]), r[1], start, size,
+        Proc2.read_shares_from_file(Proc.read_Ci(r[0]), r[1], start, active_size,
             Proc);
         return;
       case PUBINPUT:
@@ -1429,16 +1441,16 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
           }
         break;
       case FIXINPUT:
-        Proc.fixinput(*this);
+        Proc.fixinput(active_inst);
         return;
       case PREP:
-        Procp.DataF.get(Proc.Procp.get_S(), r, start, size);
+        Procp.DataF.get(Proc.Procp.get_S(), r, start, active_size);
         return;
       case GPREP:
-        Proc2.DataF.get(Proc.Proc2.get_S(), r, start, size);
+        Proc2.DataF.get(Proc.Proc2.get_S(), r, start, active_size);
         return;
       case CISC:
-        Procp.protocol.cisc(Procp, *this);
+        Procp.protocol.cisc(Procp, active_inst);
         return;
       default:
         throw invalid_opcode(opcode);
@@ -1460,7 +1472,7 @@ inline void Instruction::execute(Processor<sint, sgf2n>& Proc) const
 #undef X
         throw runtime_error("wrong case statement"); return;
     }
-  if (size > 1)
+  if (active_size > 1)
     {
       r[0]++; r[1]++; r[2]++;
     }
@@ -1508,7 +1520,7 @@ void Program::execute_with_errors(Processor<sint, sgf2n>& Proc) const
       auto& r = instruction.r;
       auto& n = instruction.n;
       auto& start = instruction.start;
-      auto& size = instruction.size;
+      int size = get_effective_vector_size(Proc, instruction.size);
       (void) start;
 
 #ifdef COUNT_INSTRUCTIONS

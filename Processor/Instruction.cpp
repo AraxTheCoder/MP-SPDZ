@@ -21,10 +21,14 @@ void Instruction::execute_clear_gf2n(StackedVector<cgf2n>& registers,
 {
     auto& C2 = registers;
     auto& M2C = memory;
+    int active_size = size;
+    long prefix = Proc.get_arg().get();
+    if (prefix < 0)
+        active_size = min(active_size, int(-prefix));
     switch (opcode)
     {
 #define X(NAME, PRE, CODE) \
-        case NAME: { PRE; for (int i = 0; i < size; i++) { CODE; } } break;
+        case NAME: { PRE; for (int i = 0; i < active_size; i++) { CODE; } } break;
         CLEAR_GF2N_INSTRUCTIONS
 #undef X
     }
@@ -62,10 +66,14 @@ void Instruction::execute_regint(ArithmeticProcessor& Proc, MemoryPart<Integer>&
 {
     (void) Mi;
     auto& Ci = Proc.get_Ci();
+    int active_size = size;
+    long prefix = Proc.get_arg().get();
+    if (prefix < 0)
+        active_size = min(active_size, int(-prefix));
     switch (opcode)
     {
 #define X(NAME, PRE, CODE) \
-        case NAME: { PRE; for (int i = 0; i < size; i++) { CODE; } } break;
+        case NAME: { PRE; for (int i = 0; i < active_size; i++) { CODE; } } break;
         REGINT_INSTRUCTIONS
 #undef X
     }
@@ -73,18 +81,26 @@ void Instruction::execute_regint(ArithmeticProcessor& Proc, MemoryPart<Integer>&
 
 void Instruction::shuffle(ArithmeticProcessor& Proc) const
 {
-    for (int i = 0; i < size; i++)
+    int active_size = size;
+    long prefix = Proc.get_arg().get();
+    if (prefix < 0)
+        active_size = min(active_size, int(-prefix));
+    for (int i = 0; i < active_size; i++)
         Proc.write_Ci(r[0] + i, Proc.read_Ci(r[1] + i));
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < active_size; i++)
     {
-        int j = Proc.shared_prng.get_uint(size - i);
+        int j = Proc.shared_prng.get_uint(active_size - i);
         swap(Proc.get_Ci_ref(r[0] + i), Proc.get_Ci_ref(r[0] + i + j));
     }
 }
 
 void Instruction::bitdecint(ArithmeticProcessor& Proc) const
 {
-    for (int j = 0; j < size; j++)
+    int active_size = size;
+    long prefix = Proc.get_arg().get();
+    if (prefix < 0)
+        active_size = min(active_size, int(-prefix));
+    for (int j = 0; j < active_size; j++)
     {
         long a = Proc.read_Ci(r[0] + j);
         for (unsigned int i = 0; i < start.size(); i++)
