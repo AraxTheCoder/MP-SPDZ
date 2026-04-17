@@ -69,7 +69,7 @@ def vectorize(function):
         if set_active_vector_size:
             starg(context_saved_arg)
             active = regint.inc(size) < active_vector_size
-            # res = mask_output(res, active)
+            res = mask_output(res, active)
         
         if size is not None:
             instructions_base.reset_global_vector_size()
@@ -78,7 +78,6 @@ def vectorize(function):
 
     vectorized_function.__name__ = function.__name__
     copy_doc(vectorized_function, function)
-
     return vectorized_function
 
 def set_instruction_type(function):
