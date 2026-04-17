@@ -160,7 +160,8 @@ def vectorized_prefixable(function):
             set_vector_size = True
 
         old_arg = None
-        if active_len is not None:
+        should_set_prefix = active_len is not None and size is not None and size > 1
+        if should_set_prefix:
             old_arg = get_arg()
             starg(-active_len)
 
@@ -171,7 +172,7 @@ def vectorized_prefixable(function):
                 res = mask_output(res, active)
             return res
         finally:
-            if active_len is not None:
+            if should_set_prefix:
                 starg(old_arg)
             if set_vector_size:
                 instructions_base.reset_global_vector_size()
