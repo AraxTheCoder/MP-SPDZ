@@ -77,7 +77,6 @@ def vectorize(function):
         return res
 
     vectorized_function.__name__ = function.__name__
-    vectorized_function.__wrapped__ = function
     copy_doc(vectorized_function, function)
 
     return vectorized_function
