@@ -24,162 +24,63 @@ def get_block():
     return get_program().curr_block
 
 def vectorize(function):
-    def vectorized_function(*args, **kwargs):
-        if len(args) > 0 and 'size' in dir(args[0]):
-            instructions_base.set_global_vector_size(args[0].size)
-            res = function(*args, **kwargs)
-            instructions_base.reset_global_vector_size()
-        elif 'size' in kwargs:
-            instructions_base.set_global_vector_size(kwargs['size'])
-            del kwargs['size']
-            res = function(*args, **kwargs)
-            instructions_base.reset_global_vector_size()
-        else:
-            res = function(*args, **kwargs)
-        return res
-    vectorized_function.__name__ = function.__name__
-    copy_doc(vectorized_function, function)
-    return vectorized_function
-
-def vectorized_function(function):
-    tape = FunctionCallTape(function)
-
-    def mask_output(value, active):
+    def mask_output(value, active: regint):
+        if value is None:
+            return None
         if isinstance(value, tuple):
             return tuple(mask_output(x, active) for x in value)
         if isinstance(value, list):
             return [mask_output(x, active) for x in value]
-        if value is None:
-            return None
-        try:
-            size = value.size
-        except AttributeError:
-            return value
-        if size == 1:
-            return value
-        try:
-            return value * type(value).conv(active)
-        except Exception:
-            try:
-                return value * value.clear_type.conv(active)
-            except Exception:
-                return value
-
-    def get_vector_size(call_args, call_kwargs):
-        if 'size' in call_kwargs:
-            return call_kwargs['size']
-        for arg in call_args:
-            if hasattr(arg, 'size'):
-                return arg.size
-        return None
-
-    def wrapped(*args, **kwargs):
-        active_len = kwargs.pop('active_len', None)
-        call_args = args
         
-        # active_len_value = None
-        if isinstance(active_len, cint):
-            active_len = active_len.to_regint(sync=False)
-        if isinstance(active_len, regint):
-            active_len = MemValue(active_len).read()
-
-        set_vector_size = False
-        size = get_vector_size(call_args, kwargs)
-
-        if size is not None:
-            if 'size' in kwargs:
-                del kwargs['size']
-            instructions_base.set_global_vector_size(size)
-            set_vector_size = True
-
-        if active_len is not None:
-            tape.runtime_arg = -active_len
-        else:
-            tape.runtime_arg = None
-
-        try:
-            res = tape(*call_args, **kwargs)
-            if active_len is not None and size is not None and size != 1:
-                active = regint.inc(size) < active_len
-                res = mask_output(res, active)
-            return res
-        finally:
-            if set_vector_size:
-                instructions_base.reset_global_vector_size()
-            tape.runtime_arg = None
-    wrapped.__name__ = function.__name__
-    copy_doc(wrapped, function)
-    return wrapped
-
-def vectorized_prefixable(function):
-    def mask_output(value, active):
-        if isinstance(value, tuple):
-            return tuple(mask_output(x, active) for x in value)
-        if isinstance(value, list):
-            return [mask_output(x, active) for x in value]
-        if value is None:
-            return None
         try:
             size = value.size
         except AttributeError:
             return value
+        
         if size == 1:
             return value
-        try:
-            return value * type(value).conv(active)
-        except Exception:
-            try:
-                return value * value.clear_type.conv(active)
-            except Exception:
-                return value
+
+        return value * active
 
     def get_vector_size(call_args, call_kwargs):
-        if 'size' in call_kwargs:
+        if len(call_args) > 0 and 'size' in dir(call_args[0]):
+            return call_args[0].size
+        elif 'size' in call_kwargs:
             return call_kwargs['size']
-        for arg in call_args:
-            if hasattr(arg, 'size'):
-                return arg.size
-        return None
+        else:
+            return None
 
-    def wrapped(*args, **kwargs):
-        active_len = kwargs.pop('active_len', None)
-        call_args = args
-
-        if isinstance(active_len, cint):
-            active_len = active_len.to_regint(sync=False)
-        if isinstance(active_len, regint):
-            active_len = MemValue(active_len).read()
-
-        set_vector_size = False
-        size = get_vector_size(call_args, kwargs)
-
+    def vectorized_function(*args, **kwargs):
+        size = get_vector_size(args, kwargs)
         if size is not None:
             if 'size' in kwargs:
                 del kwargs['size']
             instructions_base.set_global_vector_size(size)
-            set_vector_size = True
 
-        old_arg = None
-        should_set_prefix = active_len is not None and size is not None and size > 1
-        if should_set_prefix:
-            old_arg = get_arg()
-            starg(-active_len)
+        active_vector_size = regint.conv(kwargs.pop('active_length', None))
+        set_active_vector_size = active_vector_size is not None and size is not None and size > 1
+        context_saved_arg = None
+        if set_active_vector_size:
+            context_saved_arg = get_arg()
+            starg(-active_vector_size)
 
-        try:
-            res = function(*call_args, **kwargs)
-            if active_len is not None and size is not None and size != 1:
-                active = regint.inc(size) < active_len
-                res = mask_output(res, active)
-            return res
-        finally:
-            if should_set_prefix:
-                starg(old_arg)
-            if set_vector_size:
-                instructions_base.reset_global_vector_size()
+        res = function(*args, **kwargs)
 
-    wrapped.__name__ = function.__name__
-    copy_doc(wrapped, function)
-    return wrapped
+        if set_active_vector_size:
+            starg(context_saved_arg)
+            active = regint.inc(size) < active_vector_size
+            # res = mask_output(res, active)
+        
+        if size is not None:
+            instructions_base.reset_global_vector_size()
+
+        return res
+
+    vectorized_function.__name__ = function.__name__
+    vectorized_function.__wrapped__ = function
+    copy_doc(vectorized_function, function)
+
+    return vectorized_function
 
 def set_instruction_type(function):
     def instruction_typed_function(*args, **kwargs):
