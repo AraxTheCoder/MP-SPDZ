@@ -451,7 +451,6 @@ class FunctionCallTape(FunctionTape):
     def __init__(self, *args, **kwargs):
         super(FunctionTape, self).__init__(*args, **kwargs)
         self.instances = {}
-        self.runtime_arg = None
     @staticmethod
     def get_key(args, kwargs):
         key = (get_program(),)
@@ -552,12 +551,8 @@ class FunctionCallTape(FunctionTape):
             elif isinstance(x, types._vectorizable):
                 call_args += [0, base.vm_types['ci'], 1,
                               x.address, regint.conv(y.address)]
-        if self.runtime_arg is not None:
-            runtime_arg = self.runtime_arg
-        else:
-            runtime_arg = regint(0)
-        call_tape(tape_handle, runtime_arg,
-              *call_args)
+        call_tape(tape_handle, regint(0),
+                  *call_args)
         break_point('call-%s' % self.name)
         return untuplify(tuple(out_result))
 
